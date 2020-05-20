@@ -1,0 +1,98 @@
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Jogo Multiplayer</title>
+    <style>
+        body {
+            background-color: #333;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+        }
+        #screen {
+            background-color: #222;
+            border: 3px solid #000;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            image-rendering: -moz-crisp-edges;
+            width: 500px;
+            height: 500px;
+        }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+    <!--<script src="keyboard-listener.js"></script>--><!--fica de forma global no script-->
+</head>
+<body>
+    <div id="game">
+        <h3 style="color: white">You're the WHITE one. Good luck!</h3>
+        <canvas id="screen" width="40" height="40"></canvas>
+    </div>
+    <div id="score"></div>
+    <script type="module">
+        import createGame from './game.js';
+        import createKeyboardListener from './keyboard-listener.js';
+        import renderScreen from './render-screen.js';
+
+        const game = createGame();
+        const keyboardListener = createKeyboardListener(document);
+
+        const socket = io();// quando a funcao io() e executada ela retorna um objeto muito interessante,
+                            // retorna um Design Patern, que e o Event Emitter,
+                            // o Event Emitter se parece muito com o Observer, mas no Event Emitter
+                            // se consegue colocar um nome no evento.
+                            // a cada coisa que o socket io conseguir fazer ele vai emitir eventos.
+
+        socket.on('connect', () => { //nesse caso agente esta observando o evento 'connect'
+                                    // que e quando ele consegue estabelecer com sucesso uma conexao com o servidor
+            const playerId = socket.id;
+            console.log(`Player connected on Client with id: ${playerId}`);
+
+            const screen = document.getElementById('screen');
+            renderScreen(screen, game, requestAnimationFrame, playerId);
+        });
+
+        socket.on('setup', (state) => { // aqui estou escutando o evento 'setup' enviado pelo server
+                                        // estou recebendo um state
+            const playerId = socket.id;
+            game.setState(state);
+
+            keyboardListener.registerPlayerId(playerId);
+            keyboardListener.subscribe(game.movePlayer);
+            keyboardListener.subscribe((command) => {
+                socket.emit('move-player', command);
+            });
+        });
+
+        socket.on('add-player', (command) => {
+            console.log(`Receiving ${command.type} -> ${command.playerId}`);
+            game.addPlayer(command);
+        });
+
+        socket.on('remove-player', (command) => {
+            console.log(`Receiving ${command.type} -> ${command.playerId}`);
+            game.removePlayer(command);
+        });
+
+        socket.on('move-player', (command) => {
+            console.log(`Receiving ${command.type} -> ${command.playerId}`);
+
+            const playerId = socket.id;
+
+            if (playerId !== command.playerId) {
+                game.movePlayer(command);
+            }
+        });
+
+        socket.on('add-fruit', (command) => {
+            console.log(`Receiving ${command.type} -> ${command.fruitId}`);
+            game.addFruit(command);
+        });
+
+        socket.on('remove-fruit', (command) => {
+            console.log(`Receiving ${command.type} -> ${command.fruitId}`);
+            game.removeFruit(command);
+        });
+    </script>
+</body>
+</html>
